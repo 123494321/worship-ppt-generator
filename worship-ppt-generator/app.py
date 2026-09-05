@@ -1,5 +1,6 @@
 import streamlit as st
 import io
+import os
 import importlib
 import core.routine_parser
 import core.text_engine
@@ -10,7 +11,7 @@ importlib.reload(core.text_engine)
 importlib.reload(core.pptx_builder)
 
 from core.text_engine import parse_user_conti, generate_plan_text_from_conti, parse_plan_text_to_slides
-from core.pptx_builder import build_praise_pptx, get_pptx_bytes
+from core.pptx_builder import build_praise_pptx, get_pptx_bytes, get_preset_ppts, PRESET_DIR
 
 st.set_page_config(
     page_title="LOGOS 찬양 PPT 제작 스튜디오",
@@ -67,8 +68,9 @@ st.markdown("""
         visibility: hidden !important;
     }
     
-    /* 4. Tab Bar Styling */
-    div[data-testid="stRadio"] > div[role="radiogroup"] {
+    /* 4. Tab Bar Styling (Scoped to main container to prevent leaking into sidebar) */
+    section.main div[data-testid="stRadio"] > div[role="radiogroup"],
+    [data-testid="stMain"] div[data-testid="stRadio"] > div[role="radiogroup"] {
         display: flex;
         flex-direction: row;
         gap: 8px;
@@ -76,7 +78,8 @@ st.markdown("""
         padding-bottom: 0px;
         margin-bottom: 20px;
     }
-    div[data-testid="stRadio"] label {
+    section.main div[data-testid="stRadio"] label,
+    [data-testid="stMain"] div[data-testid="stRadio"] label {
         padding: 8px 18px;
         border-radius: 6px 6px 0 0;
         font-size: 1.05rem !important;
@@ -87,23 +90,28 @@ st.markdown("""
         margin-bottom: -2px;
         transition: all 0.15s ease-in-out;
     }
-    div[data-testid="stRadio"] label > div:first-child {
+    section.main div[data-testid="stRadio"] label > div:first-child,
+    [data-testid="stMain"] div[data-testid="stRadio"] label > div:first-child {
         display: none !important;
     }
-    div[data-testid="stRadio"] label p {
+    section.main div[data-testid="stRadio"] label p,
+    [data-testid="stMain"] div[data-testid="stRadio"] label p {
         color: #64748b !important;
         font-size: 1.05rem !important;
         font-weight: 600 !important;
         margin: 0 !important;
     }
-    div[data-testid="stRadio"] label:hover {
+    section.main div[data-testid="stRadio"] label:hover,
+    [data-testid="stMain"] div[data-testid="stRadio"] label:hover {
         background: rgba(37, 99, 235, 0.04);
     }
-    div[data-testid="stRadio"] label:has(input:checked) {
+    section.main div[data-testid="stRadio"] label:has(input:checked),
+    [data-testid="stMain"] div[data-testid="stRadio"] label:has(input:checked) {
         border-bottom: 3px solid #2563eb !important;
         background: rgba(37, 99, 235, 0.05);
     }
-    div[data-testid="stRadio"] label:has(input:checked) p {
+    section.main div[data-testid="stRadio"] label:has(input:checked) p,
+    [data-testid="stMain"] div[data-testid="stRadio"] label:has(input:checked) p {
         color: #2563eb !important;
         font-weight: 800 !important;
     }
@@ -127,23 +135,53 @@ st.markdown("""
     </div>
     <div>
         <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 16px; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px;">
-            v1.0.0
+            v1.3.2
         </span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar: Global Style & Settings
+# Sidebar: Global Settings & File Handlers
 with st.sidebar:
-    st.header("⚙️ PPT 디자인 및 서식 설정")
-    font_name = st.selectbox("글꼴 (폰트)", ["프리젠테이션 Bold", "Pretendard", "나눔스퀘어 Bold", "맑은 고딕", "에스코어 드림 6"], index=0)
-    font_size = st.slider("글자 크기 (기본 81pt)", min_value=60.0, max_value=96.0, value=81.0, step=1.0)
+    st.header("📁 기준 PPT 설정 [필수]")
+    st.caption("텍스트 위치, 배율, 폰트 임베딩의 기준이 되는 원본 PPT입니다.")
     
-    st.divider()
-    st.header("💡 슬라이드 암전 규칙")
-    title_blank = st.checkbox("곡 제목 뒤 암전(전주/준비) 자동 삽입", value=True)
-    end_blank = st.checkbox("곡 종료 시 암전(곡 전환) 자동 삽입", value=True)
+    template_mode = st.radio(
+        "기준 PPT 지정 방식",
+        ["교회 표준 프리셋 선택", "내 PC에서 직접 업로드"],
+        index=0
+    )
     
+    active_template_source = None
+    active_template_name = None
+    
+    if template_mode == "교회 표준 프리셋 선택":
+        preset_files = get_preset_ppts()
+        if preset_files:
+            selected_preset = st.radio(
+                "표준 프리셋 선택",
+                preset_files,
+                index=0,
+                help="프로젝트에 등록된 교회 표준 찬양 PPT 목록입니다."
+            )
+            active_template_source = os.path.join(PRESET_DIR, selected_preset)
+            active_template_name = selected_preset
+            st.caption(f"📌 적용 중: **{selected_preset}**")
+        else:
+            st.error("등록된 표준 프리셋 파일이 없습니다. 직접 업로드를 선택해 주세요.")
+    else:
+        uploaded_template = st.file_uploader(
+            "기준 PPT 파일 (.pptx)",
+            type=["pptx"],
+            help="사용할 기준 PPTX 파일을 업로드하세요. 해당 파일의 텍스트 박스 위치, 여백, 폰트 임베딩을 그대로 복제합니다."
+        )
+        if uploaded_template is not None:
+            active_template_source = uploaded_template
+            active_template_name = uploaded_template.name
+            st.caption(f"📤 적용 중: **{uploaded_template.name}**")
+        else:
+            st.warning("⚠️ 기준이 될 .pptx 파일을 업로드해야 PPT 생성이 가능합니다.")
+
     st.divider()
     st.header("📁 콘티 파일 업로드")
     uploaded_file = st.file_uploader(
@@ -158,18 +196,28 @@ with st.sidebar:
             st.session_state.conti_editor = file_content
             st.rerun()
 
+    st.divider()
+    st.header("💡 슬라이드 암전 규칙")
+    title_blank = st.checkbox("곡 제목 뒤 암전(전주/준비) 자동 삽입", value=True)
+    end_blank = st.checkbox("곡 종료 시 암전(곡 전환) 자동 삽입", value=True)
+
 # Stateful Tabs (100% Cross-origin Cloud Safe)
 tab_options = ["1. 콘티 작성", "2. PPT 기획안"]
-current_tab_idx = tab_options.index(st.session_state.selected_tab) if st.session_state.selected_tab in tab_options else 0
+
+if "switch_to_tab" in st.session_state:
+    st.session_state.selected_tab = st.session_state.switch_to_tab
+    del st.session_state.switch_to_tab
+
+if "selected_tab" not in st.session_state or st.session_state.selected_tab not in tab_options:
+    st.session_state.selected_tab = "1. 콘티 작성"
 
 active_tab = st.radio(
     "메뉴 탭 선택",
     tab_options,
-    index=current_tab_idx,
+    key="selected_tab",
     horizontal=True,
     label_visibility="collapsed"
 )
-st.session_state.selected_tab = active_tab
 
 # ==========================================
 # TAB 1: CONTI WRITING
@@ -203,7 +251,7 @@ if active_tab == "1. 콘티 작성":
                 )
                 st.session_state.plan_text = new_plan
                 st.session_state.plan_editor = new_plan
-                st.session_state.selected_tab = "2. PPT 기획안"
+                st.session_state.switch_to_tab = "2. PPT 기획안"
                 st.rerun()
             
     with col_guide:
@@ -241,7 +289,8 @@ elif active_tab == "2. PPT 기획안":
     with c_stat1:
         st.metric("총 슬라이드 수", f"{total_slide_count} 장")
     with c_stat2:
-        st.metric("글꼴 / 크기", f"{font_name} / {font_size}pt")
+        template_display = active_template_name if active_template_name else "미지정 (사이드바 설정 필요)"
+        st.metric("적용 기준 PPT", template_display)
         
     st.divider()
     
@@ -259,12 +308,19 @@ elif active_tab == "2. PPT 기획안":
         
     st.divider()
     
-    if st.button("PPT 파일 생성", type="primary", use_container_width=True):
+    is_template_ready = (active_template_source is not None)
+    
+    if not is_template_ready:
+        st.warning("⚠️ **[필수] 기준 PPT가 설정되지 않았습니다.**\n\n좌측 사이드바의 **「📁 기준 PPT 설정」**에서 [교회 표준 프리셋]을 선택하거나 [직접 파일 업로드]를 완료해야 PPT를 생성할 수 있습니다.")
+    else:
+        st.info(f"🎯 **적용 중인 기준 PPT**: `{active_template_name}`")
+        
+    if st.button("PPT 파일 생성", type="primary", use_container_width=True, disabled=not is_template_ready):
         if not current_slides:
             st.warning("⚠️ 슬라이드 기획안 내용이 비어있습니다. 1단계에서 콘티를 작성 후 생성해 주세요.")
         else:
-            with st.spinner("양 끝 꽉 찬 텍스트 박스로 PPTX 빌드 중... (줄바꿈 방지 적용)"):
-                prs = build_praise_pptx(current_slides, font_name=font_name, font_size_pt=font_size)
+            with st.spinner("기준 PPT 서식 및 폰트 임베딩을 1:1 딥클론하여 PPTX 빌드 중..."):
+                prs = build_praise_pptx(current_slides, template_source=active_template_source)
                 pptx_bytes = get_pptx_bytes(prs)
                 
                 parsed = parse_user_conti(st.session_state.get("conti_editor", st.session_state.conti_text))
@@ -322,8 +378,8 @@ st.components.v1.html("""
                 if (parent) {
                     const textEl = parent.firstElementChild;
                     if (textEl && textEl !== btn) {
-                        if (textEl.textContent !== 'Made by @loose_lab v1.0.0') {
-                            textEl.textContent = 'Made by @loose_lab v1.0.0';
+                        if (textEl.textContent !== 'Made by @loose_lab v1.3.2') {
+                            textEl.textContent = 'Made by @loose_lab v1.3.2';
                             textEl.style.fontSize = '0.82rem';
                             textEl.style.color = '#808495';
                             textEl.style.userSelect = 'text';
