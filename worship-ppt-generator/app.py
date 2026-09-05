@@ -115,8 +115,8 @@ if "conti_text" not in st.session_state:
     st.session_state.conti_text = ""
 if "plan_text" not in st.session_state:
     st.session_state.plan_text = ""
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "1. 콘티 작성"
+if "selected_tab" not in st.session_state:
+    st.session_state.selected_tab = "1. 콘티 작성"
 
 # Header
 st.markdown("""
@@ -159,13 +159,17 @@ with st.sidebar:
             st.rerun()
 
 # Stateful Tabs (100% Cross-origin Cloud Safe)
+tab_options = ["1. 콘티 작성", "2. PPT 기획안"]
+current_tab_idx = tab_options.index(st.session_state.selected_tab) if st.session_state.selected_tab in tab_options else 0
+
 active_tab = st.radio(
     "메뉴 탭 선택",
-    ["1. 콘티 작성", "2. PPT 기획안"],
+    tab_options,
+    index=current_tab_idx,
     horizontal=True,
-    key="active_tab",
     label_visibility="collapsed"
 )
+st.session_state.selected_tab = active_tab
 
 # ==========================================
 # TAB 1: CONTI WRITING
@@ -199,7 +203,7 @@ if active_tab == "1. 콘티 작성":
                 )
                 st.session_state.plan_text = new_plan
                 st.session_state.plan_editor = new_plan
-                st.session_state.active_tab = "2. PPT 기획안"
+                st.session_state.selected_tab = "2. PPT 기획안"
                 st.rerun()
             
     with col_guide:
