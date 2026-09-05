@@ -66,6 +66,47 @@ st.markdown("""
         display: none !important;
         visibility: hidden !important;
     }
+    
+    /* 4. Tab Bar Styling */
+    div[data-testid="stRadio"] > div[role="radiogroup"] {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 0px;
+        margin-bottom: 20px;
+    }
+    div[data-testid="stRadio"] label {
+        padding: 8px 18px;
+        border-radius: 6px 6px 0 0;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        cursor: pointer;
+        background: transparent;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.15s ease-in-out;
+    }
+    div[data-testid="stRadio"] label > div:first-child {
+        display: none !important;
+    }
+    div[data-testid="stRadio"] label p {
+        color: #64748b !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        margin: 0 !important;
+    }
+    div[data-testid="stRadio"] label:hover {
+        background: rgba(37, 99, 235, 0.04);
+    }
+    div[data-testid="stRadio"] label:has(input:checked) {
+        border-bottom: 3px solid #2563eb !important;
+        background: rgba(37, 99, 235, 0.05);
+    }
+    div[data-testid="stRadio"] label:has(input:checked) p {
+        color: #2563eb !important;
+        font-weight: 800 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,8 +115,8 @@ if "conti_text" not in st.session_state:
     st.session_state.conti_text = ""
 if "plan_text" not in st.session_state:
     st.session_state.plan_text = ""
-if "switch_to_tab2" not in st.session_state:
-    st.session_state.switch_to_tab2 = False
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "1. 콘티 작성"
 
 # Header
 st.markdown("""
@@ -117,16 +158,19 @@ with st.sidebar:
             st.session_state.conti_editor = file_content
             st.rerun()
 
-# 2 Original Native Tabs
-tab1, tab2 = st.tabs([
-    "1. 콘티 작성",
-    "2. PPT 기획안"
-])
+# Stateful Tabs (100% Cross-origin Cloud Safe)
+active_tab = st.radio(
+    "메뉴 탭 선택",
+    ["1. 콘티 작성", "2. PPT 기획안"],
+    horizontal=True,
+    key="active_tab",
+    label_visibility="collapsed"
+)
 
 # ==========================================
 # TAB 1: CONTI WRITING
 # ==========================================
-with tab1:
+if active_tab == "1. 콘티 작성":
     st.subheader("1단계: 콘티 서식 작성")
     st.caption("고정 정보(# 모임명, 기도자), 곡 제목(##), 루틴 문자열, 파트([V], [C] 등)를 작성하세요. 슬라이드는 **빈 줄(더블 엔터)**로 나뉩니다.")
     
@@ -155,7 +199,7 @@ with tab1:
                 )
                 st.session_state.plan_text = new_plan
                 st.session_state.plan_editor = new_plan
-                st.session_state.switch_to_tab2 = True
+                st.session_state.active_tab = "2. PPT 기획안"
                 st.rerun()
             
     with col_guide:
@@ -181,7 +225,7 @@ with tab1:
 # ==========================================
 # TAB 2: PPT PLAN TEXT (HUMAN GATE)
 # ==========================================
-with tab2:
+elif active_tab == "2. PPT 기획안":
     st.subheader("2단계: PPT 기획안 검토 및 수정")
     st.caption("생성된 슬라이드 텍스트를 검토하고 오탈자나 [BLANK] 암전 위치를 자유롭게 수정하세요.")
     
@@ -328,13 +372,4 @@ st.components.v1.html("""
     } catch(e) {}
 </script>
 """, height=0)
-
-# Automatic Tab Switch Script
-if st.session_state.switch_to_tab2:
-    st.session_state.switch_to_tab2 = False
-    st.components.v1.html("""
-    <script>
-        window.parent.document.querySelectorAll('button[data-baseweb="tab"]')[1].click();
-    </script>
-    """, height=0)
 
